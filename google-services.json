@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "785845575961",
+    "project_id": "urgences-d3be6",
+    "storage_bucket": "urgences-d3be6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:785845575961:android:5c3e17cc79733cedb76588",
+        "android_client_info": {
+          "package_name": "com.urgences237.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRl7v9V9Bk11y31RC9_Biy6apP42GZWHo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

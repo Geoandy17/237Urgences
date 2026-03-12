@@ -5,26 +5,70 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0A0A0A"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.urgences237.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "237Urgences a besoin d'accéder à votre caméra pour prendre des photos d'incidents.",
+        "NSMicrophoneUsageDescription": "237Urgences a besoin d'accéder à votre microphone pour enregistrer des messages vocaux.",
+        "NSLocationWhenInUseUsageDescription": "237Urgences a besoin de votre position pour localiser les incidents."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0A0A0A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.urgences237.app",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CALL_PHONE",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "237Urgences a besoin de votre position pour localiser les incidents."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "237Urgences a besoin d'accéder à vos photos pour joindre des preuves.",
+          "cameraPermission": "237Urgences a besoin de votre caméra pour photographier les incidents."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "237Urgences a besoin d'accéder au microphone pour les messages vocaux."
+        }
+      ],
+      "expo-font",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "06d971c0-2474-4b86-92e4-b396ac5d98c3"
+      }
     }
   }
 }
