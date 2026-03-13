@@ -10,9 +10,10 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { useTheme } from '../config/theme';
 import { useI18n } from '../config/i18n';
-import { useAuth, checkUserExists } from '../config/auth';
+import { useAuth } from '../config/auth';
 import { auth, firebaseConfig, getNativeAuth } from '../config/firebase';
 import { getConfirmationResult, setConfirmationResult, clearConfirmationResult } from '../utils/nativeAuthState';
+import { apiRegister } from '../services/api';
 
 // Recaptcha uniquement sur web (pour le resend)
 let FirebaseRecaptchaVerifierModal: any = null;
@@ -26,7 +27,7 @@ type Props = {
 };
 
 export default function OTPScreen({ navigation, route }: Props) {
-  const { phoneNumber, verificationId: initialVerificationId, nom, prenom, email } = route.params;
+  const { phoneNumber, verificationId: initialVerificationId, nom, prenom, email, motDePasse } = route.params;
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(60);
   const [verifying, setVerifying] = useState(false);
@@ -55,32 +56,48 @@ export default function OTPScreen({ navigation, route }: Props) {
     if (fullCode.length < 6 || verifying) return;
     setVerifying(true);
     try {
+      // Étape 1 : Vérifier le code OTP avec Firebase
       if (Platform.OS === 'web') {
-        // Web : SDK JS Firebase
         const credential = PhoneAuthProvider.credential(verificationId!, fullCode);
         await signInWithCredential(auth, credential);
       } else {
-        // Native : @react-native-firebase/auth
         const confirmation = getConfirmationResult();
         if (!confirmation) throw new Error('Session expirée, veuillez renvoyer le code');
         await confirmation.confirm(fullCode);
         clearConfirmationResult();
       }
 
-      // Vérifier si l'utilisateur existe dans Firestore
-      const existingUser = await checkUserExists(phoneNumber);
-      if (existingUser) {
-        // Utilisateur existant → récupérer son profil
-        await login(existingUser);
-      } else if (nom || prenom) {
-        // Nouvel utilisateur venant du formulaire Register → créer le profil
-        await login({ phoneNumber, nom: nom || '', prenom: prenom || '', email });
+      // Étape 2 : Numéro vérifié → créer le compte via l'API
+      const result = await apiRegister({
+        nom,
+        prenom,
+        telephone: phoneNumber,
+        email: email || undefined,
+        motDePasse,
+      });
+
+      if (result.success && result.data) {
+        // Étape 3 : Connexion JWT
+        await login(
+          {
+            userId: result.data.userId,
+            nom: result.data.nom,
+            prenom: result.data.prenom,
+            telephone: result.data.telephone,
+            role: result.data.role,
+          },
+          result.data.accessToken,
+          result.data.refreshToken,
+        );
+        // Navigation automatique via isLoggedIn = true
       } else {
-        // Connexion sans profil trouvé (Firestore inaccessible ou premier login sans Register)
-        // Sauvegarder avec le numéro seulement, sans écraser un éventuel profil existant
-        await login({ phoneNumber, nom: '', prenom: '', email: '' });
+        const msg = result.message || t('error');
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert(t('error'), msg);
+        }
       }
-      // Navigation automatique via isLoggedIn = true
     } catch (err: any) {
       console.error('OTP verify error:', err);
       const isInvalidCode = err?.code === 'auth/invalid-verification-code';
@@ -102,14 +119,12 @@ export default function OTPScreen({ navigation, route }: Props) {
     setResending(true);
     try {
       if (Platform.OS === 'web') {
-        // Web : SDK JS Firebase
         const verifier = recaptchaVerifier.current!;
         const phoneProvider = new PhoneAuthProvider(auth);
         const firebaseVerifier = verifier.getFirebaseVerifier();
         const newVerificationId = await phoneProvider.verifyPhoneNumber(phoneNumber, firebaseVerifier);
         setVerificationId(newVerificationId);
       } else {
-        // Native : renvoyer le SMS via @react-native-firebase/auth
         const nativeAuth = getNativeAuth();
         const confirmation = await nativeAuth().signInWithPhoneNumber(phoneNumber, true);
         setConfirmationResult(confirmation);

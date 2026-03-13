@@ -1,13 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Platform, Animated, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, Platform, Animated, ScrollView, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList, IncidentPayload } from '../types';
+import { RootStackParamList } from '../types';
 import { useTheme } from '../config/theme';
 import { useI18n } from '../config/i18n';
+import * as Clipboard from 'expo-clipboard';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'IncidentConfirmation'>;
@@ -18,7 +19,7 @@ export default function IncidentConfirmationScreen({ navigation, route }: Props)
   const { colors, mode } = useTheme();
   const { t } = useI18n();
   const isDark = mode === 'dark';
-  const { payload } = route.params;
+  const { reference } = route.params;
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -26,20 +27,16 @@ export default function IncidentConfirmationScreen({ navigation, route }: Props)
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Séquence d'animation
     Animated.sequence([
-      // 1. Le cercle de succès apparaît avec un bounce
       Animated.spring(scaleAnim, {
         toValue: 1, friction: 4, tension: 60, useNativeDriver: true,
       }),
-      // 2. Le contenu slide + fade in
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
       ]),
     ]).start();
 
-    // Pulse continu sur le cercle
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.05, duration: 1200, useNativeDriver: true }),
@@ -48,17 +45,16 @@ export default function IncidentConfirmationScreen({ navigation, route }: Props)
     ).start();
   }, []);
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString('fr-FR', {
-      day: '2-digit', month: 'long', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
+  const copyReference = async () => {
+    try {
+      await Clipboard.setStringAsync(reference);
+      if (Platform.OS === 'web') {
+        window.alert(t('tracking_copied'));
+      } else {
+        Alert.alert('', t('tracking_copied'));
+      }
+    } catch {}
   };
-
-  const locationText = payload.location.mode === 'gps'
-    ? payload.location.address || `${payload.location.latitude?.toFixed(4)}, ${payload.location.longitude?.toFixed(4)}`
-    : `${payload.location.quartierManuel}, ${payload.location.villeManuelle}`;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -85,21 +81,18 @@ export default function IncidentConfirmationScreen({ navigation, route }: Props)
             {t('confirm_subtitle')}
           </Text>
 
-          {/* Fiche récapitulative */}
+          {/* Carte référence */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.shadowColor }]}>
-
-            {/* Tricolore */}
             <View style={styles.tricolor}>
               <View style={[styles.tri, { backgroundColor: '#009639' }]} />
               <View style={[styles.tri, { backgroundColor: '#CE1126' }]} />
               <View style={[styles.tri, { backgroundColor: '#FCBF49' }]} />
             </View>
 
-            {/* ID + Date */}
             <View style={[styles.cardTop, { backgroundColor: isDark ? '#0A0F1A' : '#F0F4FF' }]}>
               <View>
                 <Text style={[styles.cardTopLabel, { color: colors.textMuted }]}>{t('confirm_id')}</Text>
-                <Text style={[styles.cardTopId, { color: colors.accent }]}>{payload.id}</Text>
+                <Text style={[styles.cardTopId, { color: colors.accent }]}>{reference}</Text>
               </View>
               <View style={[styles.statusPill, { backgroundColor: '#009639' + '18' }]}>
                 <View style={[styles.statusDot, { backgroundColor: '#009639' }]} />
@@ -107,77 +100,19 @@ export default function IncidentConfirmationScreen({ navigation, route }: Props)
               </View>
             </View>
 
-            {/* Infos */}
             <View style={styles.cardBody}>
-
-              {/* Type */}
-              <View style={styles.row}>
-                <View style={[styles.rowIcon, { backgroundColor: colors.dangerLight }]}>
-                  <Ionicons name="warning" size={16} color={colors.danger} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{t('confirm_type')}</Text>
-                  <Text style={[styles.rowValue, { color: colors.text }]}>{payload.typeLabel}</Text>
-                </View>
-              </View>
-
-              <View style={[styles.sep, { backgroundColor: colors.borderLight }]} />
-
-              {/* Description */}
-              <View style={styles.row}>
-                <View style={[styles.rowIcon, { backgroundColor: colors.accentLight }]}>
-                  <Ionicons name="document-text" size={16} color={colors.accent} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{t('confirm_desc')}</Text>
-                  <Text style={[styles.rowValue, { color: colors.text }]} numberOfLines={2}>{payload.description}</Text>
-                </View>
-              </View>
-
-              <View style={[styles.sep, { backgroundColor: colors.borderLight }]} />
-
-              {/* Localisation */}
-              <View style={styles.row}>
-                <View style={[styles.rowIcon, { backgroundColor: colors.warningLight }]}>
-                  <Ionicons name="location" size={16} color={colors.warning} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{t('confirm_location')}</Text>
-                  <Text style={[styles.rowValue, { color: colors.text }]}>{locationText}</Text>
-                </View>
-              </View>
-
-              <View style={[styles.sep, { backgroundColor: colors.borderLight }]} />
-
-              {/* Contact */}
-              <View style={styles.row}>
-                <View style={[styles.rowIcon, { backgroundColor: colors.successLight }]}>
-                  <Ionicons name="call" size={16} color={colors.success} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{t('confirm_contact')}</Text>
-                  <Text style={[styles.rowValue, { color: colors.text }]}>
-                    {payload.contactUrgence.nom ? `${payload.contactUrgence.nom} - ` : ''}
-                    {payload.contactUrgence.countryDial} {payload.contactUrgence.phone}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={[styles.sep, { backgroundColor: colors.borderLight }]} />
-
-              {/* Date */}
-              <View style={styles.row}>
-                <View style={[styles.rowIcon, { backgroundColor: isDark ? '#1A1A1A' : '#F1F5F9' }]}>
-                  <Ionicons name="time" size={16} color={colors.textMuted} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{t('confirm_date')}</Text>
-                  <Text style={[styles.rowValue, { color: colors.text }]}>{formatDate(payload.timestamp)}</Text>
-                </View>
-              </View>
+              <Text style={[styles.refInfo, { color: colors.textSecondary }]}>
+                Conservez cette référence pour suivre votre incident.
+              </Text>
+              <TouchableOpacity
+                style={[styles.copyBtn, { backgroundColor: colors.accentLight }]}
+                onPress={copyReference} activeOpacity={0.7}
+              >
+                <Ionicons name="copy-outline" size={16} color={colors.accent} />
+                <Text style={[styles.copyText, { color: colors.accent }]}>{t('tracking_copy')}</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Footer */}
             <View style={[styles.cardFooter, { borderTopColor: colors.borderLight, backgroundColor: isDark ? '#0A0F1A' : '#F8FAFC' }]}>
               <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
               <Text style={[styles.cardFooterText, { color: colors.textMuted }]}>
@@ -186,7 +121,17 @@ export default function IncidentConfirmationScreen({ navigation, route }: Props)
             </View>
           </View>
 
-          {/* Bouton retour */}
+          {/* Bouton suivre */}
+          <TouchableOpacity
+            style={[styles.trackBtn, { backgroundColor: '#009639' }]}
+            onPress={() => navigation.replace('IncidentTracking' as any, { reference })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="navigate" size={20} color="#FFF" />
+            <Text style={styles.trackBtnText}>{t('confirm_track')}</Text>
+          </TouchableOpacity>
+
+          {/* Bouton retour accueil */}
           <TouchableOpacity
             style={[styles.homeBtn, { backgroundColor: colors.accent }]}
             onPress={() => navigation.navigate('MainTabs')}
@@ -218,7 +163,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Succès
   successArea: { alignItems: 'center', marginBottom: 24 },
   successRing3: {
     width: 130, height: 130, borderRadius: 65,
@@ -238,7 +182,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
   subtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 28, paddingHorizontal: 10 },
 
-  // Card
   card: {
     borderRadius: 20, borderWidth: 1, overflow: 'hidden', marginBottom: 24,
     shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 6,
@@ -259,15 +202,13 @@ const styles = StyleSheet.create({
   statusDot: { width: 7, height: 7, borderRadius: 4 },
   statusText: { fontSize: 12, fontWeight: '700' },
 
-  cardBody: { paddingHorizontal: 20, paddingVertical: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
-  rowIcon: {
-    width: 38, height: 38, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center',
+  cardBody: { paddingHorizontal: 20, paddingVertical: 16, alignItems: 'center', gap: 14 },
+  refInfo: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  copyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12,
   },
-  rowLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 3 },
-  rowValue: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  sep: { height: 1 },
+  copyText: { fontSize: 13, fontWeight: '600' },
 
   cardFooter: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -275,7 +216,12 @@ const styles = StyleSheet.create({
   },
   cardFooterText: { fontSize: 13, fontWeight: '600' },
 
-  // Boutons
+  trackBtn: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    gap: 10, paddingVertical: 18, borderRadius: 16, marginBottom: 12,
+  },
+  trackBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+
   homeBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     gap: 10, paddingVertical: 18, borderRadius: 16,

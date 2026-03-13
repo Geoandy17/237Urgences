@@ -9,7 +9,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import * as Location from 'expo-location';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, IncidentCategory, IncidentPayload } from '../types';
+import { RootStackParamList } from '../types';
+import { TypeUrgence, regionToEnum, apiCreateIncidentWithMedia, SignalementRequest } from '../services/api';
 import { useTheme } from '../config/theme';
 import { useI18n } from '../config/i18n';
 import { useAuth } from '../config/auth';
@@ -95,14 +96,13 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
   const { user } = useAuth();
   const isDark = mode === 'dark';
 
-  const INCIDENT_TYPES: { value: IncidentCategory; label: string; icon: string; color: string }[] = [
-    { value: 'incendie', label: t('incident_type_fire'), icon: 'flame', color: '#EF4444' },
-    { value: 'agression', label: t('incident_type_assault'), icon: 'hand-left', color: '#F97316' },
-    { value: 'accident', label: t('incident_type_road'), icon: 'car', color: '#EAB308' },
-    { value: 'vol', label: t('incident_type_medical'), icon: 'medkit', color: '#EC4899' },
-    { value: 'vandalisme', label: t('incident_type_natural'), icon: 'thunderstorm', color: '#6366F1' },
-    { value: 'arnaque', label: t('incident_type_scam'), icon: 'warning', color: '#F59E0B' },
-    { value: 'autre', label: t('incident_type_other'), icon: 'ellipsis-horizontal-circle', color: '#64748B' },
+  const INCIDENT_TYPES: { value: TypeUrgence; label: string; icon: string; color: string }[] = [
+    { value: 'INCENDIE', label: t('incident_type_fire'), icon: 'flame', color: '#EF4444' },
+    { value: 'AGRESSION', label: t('incident_type_assault'), icon: 'hand-left', color: '#F97316' },
+    { value: 'ACCIDENT_ROUTE', label: t('incident_type_road'), icon: 'car', color: '#EAB308' },
+    { value: 'URGENCE_MEDICALE', label: t('incident_type_medical'), icon: 'medkit', color: '#EC4899' },
+    { value: 'CATASTROPHE_NATURELLE', label: t('incident_type_natural'), icon: 'thunderstorm', color: '#6366F1' },
+    { value: 'AUTRE', label: t('incident_type_other'), icon: 'ellipsis-horizontal-circle', color: '#64748B' },
   ];
 
   const STEP_TITLES = [
@@ -117,7 +117,7 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
   ];
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedType, setSelectedType] = useState<IncidentCategory | null>(null);
+  const [selectedType, setSelectedType] = useState<TypeUrgence | null>(null);
   const [description, setDescription] = useState('');
   const [selfie, setSelfie] = useState<string | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -137,6 +137,7 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
   const [isPlaying, setIsPlaying] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
 
   const micPulse = useRef(new Animated.Value(1)).current;
   const waveAnims = useRef(Array.from({ length: 24 }, () => new Animated.Value(0.2))).current;
@@ -178,16 +179,34 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
       if (!perm.granted) { Alert.alert(t('permission_required'), t('mic_permission')); return; }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       const { recording: rec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = rec;
       setRecording(rec); setIsRecording(true); setRecordingDuration(0);
-      timerRef.current = setInterval(() => setRecordingDuration((p) => p + 1), 1000);
+      timerRef.current = setInterval(() => setRecordingDuration((p) => {
+        if (p + 1 >= 60) {
+          // Auto-stop à 60s via ref pour éviter problème de closure
+          if (timerRef.current) clearInterval(timerRef.current);
+          const r = recordingRef.current;
+          if (r) {
+            r.stopAndUnloadAsync().then(() => {
+              setAudioUri(r.getURI());
+              setRecording(null);
+              recordingRef.current = null;
+            }).catch(() => {});
+          }
+          setIsRecording(false);
+          return 60;
+        }
+        return p + 1;
+      }), 1000);
     } catch { Alert.alert(t('error'), 'Recording error'); }
   };
 
   const stopRecording = async () => {
-    if (!recording) return;
+    const rec = recordingRef.current;
+    if (!rec) return;
     setIsRecording(false);
     if (timerRef.current) clearInterval(timerRef.current);
-    try { await recording.stopAndUnloadAsync(); setAudioUri(recording.getURI()); setRecording(null); }
+    try { await rec.stopAndUnloadAsync(); setAudioUri(rec.getURI()); setRecording(null); recordingRef.current = null; }
     catch { Alert.alert(t('error'), 'Stop error'); }
   };
 
@@ -239,22 +258,42 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
         return;
       }
 
-      // Sur web, on utilise une précision plus basse et un timeout
       const isWeb = Platform.OS === 'web';
-      let loc;
-      try {
-        loc = await Location.getCurrentPositionAsync({
-          accuracy: isWeb ? Location.Accuracy.Low : Location.Accuracy.Balanced,
-        });
-      } catch {
-        // Fallback: dernière position connue (utile si GPS échoue)
-        const lastKnown = await Location.getLastKnownPositionAsync();
-        if (lastKnown) {
-          loc = lastKnown;
-        } else {
+      let loc: { coords: { latitude: number; longitude: number } } | null = null;
+
+      if (isWeb) {
+        // Web : utiliser l'API native du navigateur avec timeout
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 10000,
+              maximumAge: 60000,
+            });
+          });
+          loc = { coords: { latitude: pos.coords.latitude, longitude: pos.coords.longitude } };
+        } catch {
+          // Si le navigateur refuse aussi, passer en mode manuel
           throw new Error('location_unavailable');
         }
+      } else {
+        // Mobile : expo-location haute précision
+        try {
+          loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+            timeInterval: 10000,
+          });
+        } catch {
+          const lastKnown = await Location.getLastKnownPositionAsync();
+          if (lastKnown) {
+            loc = lastKnown;
+          } else {
+            throw new Error('location_unavailable');
+          }
+        }
       }
+
+      if (!loc) throw new Error('location_unavailable');
 
       // Reverse geocoding (peut échouer sur web)
       let city = '';
@@ -265,19 +304,44 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
         });
-        city = addr?.city || addr?.subregion || '';
-        region = addr?.region || '';
-        const district = addr?.district || addr?.subregion || '';
-        const street = addr?.street || '';
-        const name = addr?.name || '';
-        // Éviter les noms qui sont juste des numéros (ex: "1")
-        const streetName = street || (name && !/^\d+$/.test(name) ? name : '');
-        // Construire l'adresse en évitant les doublons
-        const parts = [streetName, district, city, region].filter(Boolean);
-        const uniqueParts = parts.filter((v, i) => parts.indexOf(v) === i);
-        address = uniqueParts.join(', ');
+        if (addr) {
+          city = addr.city || addr.subregion || '';
+          region = addr.region || '';
+          const name = addr.name || '';
+          const street = addr.street || '';
+          const streetNumber = addr.streetNumber || '';
+          const subregion = addr.subregion || '';
+          const isJustNumber = (s: string) => /^\d+$/.test(s.trim());
+          const quartierName = (!isJustNumber(name) ? name : '') || (!isJustNumber(street) ? street : '');
+          const streetFull = streetNumber && quartierName ? `${streetNumber} ${quartierName}` : quartierName;
+          const parts = [streetFull, subregion !== city ? subregion : '', city, region].filter(Boolean);
+          const uniqueParts = parts.filter((v, i) => parts.indexOf(v) === i);
+          address = uniqueParts.join(', ');
+        }
       } catch {
-        // Reverse geocoding indisponible, on garde juste les coordonnées
+        // Expo reverse geocoding indisponible
+      }
+
+      // Fallback : Nominatim (OpenStreetMap) si l'adresse est vide
+      if (!address) {
+        try {
+          const resp = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${loc.coords.latitude}&lon=${loc.coords.longitude}&format=json&accept-language=fr`,
+            { headers: { 'User-Agent': '237Urgences/1.0' } }
+          );
+          const data = await resp.json();
+          if (data?.address) {
+            const a = data.address;
+            const quartierNom = a.suburb || a.neighbourhood || a.hamlet || a.village || '';
+            city = a.city || a.town || a.village || city;
+            region = a.state || region;
+            const road = a.road || '';
+            const addrParts = [road, quartierNom, city, region].filter(Boolean);
+            address = addrParts.filter((v: string, i: number) => addrParts.indexOf(v) === i).join(', ');
+          }
+        } catch {
+          // Nominatim aussi indisponible
+        }
       }
 
       setGpsLocation({
@@ -300,7 +364,7 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
   };
 
   const canGoNext = () => {
-    if (currentStep === 1) return selectedType !== null && description.trim().length > 0 && selfie !== null;
+    if (currentStep === 1) return selectedType !== null && description.trim().length >= 3 && selfie !== null;
     if (currentStep === 2) return (useGPS ? gpsLocation !== null : (ville.trim() && quartier.trim()));
     return true;
   };
@@ -317,75 +381,57 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
     setSubmitting(true);
 
     try {
-      const typeInfo = INCIDENT_TYPES.find((x) => x.value === selectedType);
-      const id = 'INC-' + Date.now().toString(36).toUpperCase();
+      const locationCity = useGPS ? (gpsLocation?.city || '') : ville;
+      const locationRegion = useGPS ? regionToEnum(gpsLocation?.region || '') : regionToEnum(ville);
+      const locationQuartier = useGPS ? (gpsLocation?.address || '') : quartier;
+      const lat = gpsLocation?.latitude || 0;
+      const lon = gpsLocation?.longitude || 0;
+      const fullContactPhone = contactPhone ? `${selectedCountry.dial}${contactPhone.replace(/\s/g, '')}` : (user?.telephone || '');
 
-      const payload: IncidentPayload = {
-        id,
-        timestamp: new Date().toISOString(),
-        type: selectedType!,
-        typeLabel: typeInfo?.label || '',
+      const signalement: SignalementRequest = {
+        typeUrgence: selectedType!,
         description,
-        audio: {
-          uri: audioUri,
-          durationSeconds: recordingDuration,
-        },
-        declarant: {
-          userId: user?.phoneNumber || '',
-          nom: user?.nom || '',
-          prenom: user?.prenom || '',
-          phone: user?.phoneNumber || '',
-          selfieUri: selfie!,
-        },
-        contactUrgence: {
-          nom: contactName,
-          phone: contactPhone,
-          countryCode: selectedCountry.code,
-          countryDial: selectedCountry.dial,
-        },
-        location: {
-          mode: useGPS ? 'gps' : 'manual',
-          latitude: gpsLocation?.latitude || null,
-          longitude: gpsLocation?.longitude || null,
-          address: gpsLocation?.address || null,
-          city: gpsLocation?.city || null,
-          region: gpsLocation?.region || null,
-          villeManuelle: !useGPS ? ville : null,
-          quartierManuel: !useGPS ? quartier : null,
-        },
-        status: 'pending',
-        platform: Platform.OS,
+        telephoneContact: fullContactPhone,
+        region: locationRegion,
+        ville: locationCity,
+        latitude: lat,
+        longitude: lon,
+        quartier: locationQuartier || undefined,
+        estTemoin: true,
       };
 
-      // Construire le FormData multipart pour le service tiers
-      const formData = new FormData();
-      formData.append('payload', JSON.stringify(payload));
-
-      // Selfie (obligatoire)
-      formData.append('selfie', {
-        uri: selfie!,
-        name: `${id}_selfie.jpg`,
-        type: 'image/jpeg',
-      } as any);
-
-      // Audio (optionnel)
-      if (audioUri) {
-        formData.append('audio', {
-          uri: audioUri,
-          name: `${id}_audio.m4a`,
-          type: 'audio/mp4',
-        } as any);
+      // Photos (selfie)
+      const photos: { uri: string; name: string; type: string }[] = [];
+      if (selfie) {
+        photos.push({
+          uri: selfie,
+          name: `selfie_${Date.now()}.jpg`,
+          type: 'image/jpeg',
+        });
       }
 
-      // TODO: Envoyer au service tiers
-      // await fetch('https://api.service-tiers.com/incidents', {
-      //   method: 'POST',
-      //   body: formData,
-      //   headers: { 'Content-Type': 'multipart/form-data' },
-      // });
+      // Audio (optionnel)
+      let audio: { uri: string; name: string; type: string } | undefined;
+      if (audioUri) {
+        audio = {
+          uri: audioUri,
+          name: `audio_${Date.now()}.m4a`,
+          type: 'audio/mp4',
+        };
+      }
 
-      console.log('INCIDENT PAYLOAD:', JSON.stringify(payload, null, 2));
-      navigation.replace('IncidentConfirmation', { payload });
+      const result = await apiCreateIncidentWithMedia(signalement, photos, audio);
+
+      if (result.success && result.data) {
+        navigation.replace('IncidentConfirmation', { reference: result.data.reference });
+      } else {
+        const msg = result.message || t('error');
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert(t('error'), msg);
+        }
+      }
     } catch (e) {
       console.error('Submit error:', e);
       if (Platform.OS === 'web') {
@@ -562,14 +608,19 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
       {/* GPS - Position trouvée */}
       {useGPS && gpsLocation && !loadingLocation && (
         <View style={[styles.locCard, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.shadowColor }]}>
-          {/* Carte - tuile OpenStreetMap centrée sur la position */}
-          <View style={styles.mapPreview}>
-            <Image
-              source={{ uri: `https://tile.openstreetmap.org/16/${Math.floor((gpsLocation.longitude + 180) / 360 * Math.pow(2, 16))}/${Math.floor((1 - Math.log(Math.tan(gpsLocation.latitude * Math.PI / 180) + 1 / Math.cos(gpsLocation.latitude * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, 16))}.png` }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="cover"
-            />
+          {/* Mini carte stylisée */}
+          <View style={[styles.mapPreview, { backgroundColor: isDark ? '#0D1A2D' : '#E8F0FE' }]}>
+            <View style={[styles.mapGrid]}>
+              {[0, 1, 2].map((r) => (
+                <View key={r} style={styles.mapGridRow}>
+                  {[0, 1, 2, 3].map((c) => (
+                    <View key={c} style={[styles.mapGridCell, { borderColor: isDark ? '#1A2A3D' : '#C8D8F0' }]} />
+                  ))}
+                </View>
+              ))}
+            </View>
             <View style={styles.mapPinContainer}>
+              <View style={[styles.mapPinShadow, { backgroundColor: colors.accent + '20' }]} />
               <View style={[styles.mapPin, { backgroundColor: colors.accent }]}>
                 <Ionicons name="location" size={18} color="#FFF" />
               </View>
@@ -775,10 +826,10 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
             )}
             <View style={styles.ficheIdentity}>
               <Text style={[styles.ficheName, { color: colors.text }]}>
-                {contactName || 'Déclarant'}
+                {user ? `${user.prenom} ${user.nom}` : t('summary_declarant')}
               </Text>
               <Text style={[styles.fichePhone, { color: colors.textSecondary }]}>
-                {selectedCountry.flag} {selectedCountry.dial} {contactPhone}
+                {user?.telephone || ''}
               </Text>
             </View>
             <View style={[styles.ficheBadge, { backgroundColor: typeInfo?.color || colors.accent }]}>
@@ -792,7 +843,7 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
               <Ionicons name={(typeInfo?.icon || 'alert') as any} size={20} color={typeInfo?.color || colors.accent} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>TYPE D'INCIDENT</Text>
+              <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>{t('summary_type_label')}</Text>
               <Text style={[styles.ficheTypeText, { color: typeInfo?.color || colors.accent }]}>
                 {typeInfo?.label || ''}
               </Text>
@@ -806,7 +857,7 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
             <View style={[styles.ficheItem, { borderBottomColor: colors.borderLight }]}>
               <View style={styles.ficheItemHeader}>
                 <Ionicons name="document-text" size={14} color={colors.accent} />
-                <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>DESCRIPTION</Text>
+                <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>{t('summary_description')}</Text>
               </View>
               <Text style={[styles.ficheValue, { color: colors.text }]} numberOfLines={3}>
                 {description}
@@ -818,12 +869,12 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
               <View style={[styles.ficheItem, { borderBottomColor: colors.borderLight }]}>
                 <View style={styles.ficheItemHeader}>
                   <Ionicons name="mic" size={14} color="#8B5CF6" />
-                  <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>MESSAGE VOCAL</Text>
+                  <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>{t('summary_voice')}</Text>
                 </View>
                 <View style={styles.ficheAudioRow}>
                   <View style={[styles.ficheAudioDot, { backgroundColor: '#8B5CF6' }]} />
                   <Text style={[styles.ficheValue, { color: colors.text }]}>
-                    Enregistrement - {formatDuration(recordingDuration)}
+                    {t('summary_voice_recording')} - {formatDuration(recordingDuration)}
                   </Text>
                 </View>
               </View>
@@ -833,7 +884,7 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
             <View style={[styles.ficheItem, { borderBottomColor: colors.borderLight }]}>
               <View style={styles.ficheItemHeader}>
                 <Ionicons name="location" size={14} color={colors.danger} />
-                <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>LOCALISATION</Text>
+                <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>{t('summary_location')}</Text>
               </View>
               <Text style={[styles.ficheValue, { color: colors.text }]}>
                 {locationVal}
@@ -849,13 +900,13 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
             <View style={styles.ficheItem}>
               <View style={styles.ficheItemHeader}>
                 <Ionicons name="call" size={14} color={colors.success} />
-                <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>CONTACT</Text>
+                <Text style={[styles.ficheLabel, { color: colors.textMuted }]}>{t('summary_contact')}</Text>
               </View>
               <Text style={[styles.ficheValue, { color: colors.text }]}>
                 {contactName || '-'}
               </Text>
               <Text style={[styles.ficheCoords, { color: colors.textSecondary }]}>
-                {selectedCountry.flag} {selectedCountry.dial} {contactPhone}
+                {contactPhone ? `${selectedCountry.flag} ${selectedCountry.dial} ${contactPhone}` : '-'}
               </Text>
             </View>
           </View>
@@ -864,7 +915,7 @@ export default function DeclareIncidentScreen({ navigation }: Props) {
           <View style={[styles.ficheFooter, { backgroundColor: isDark ? '#0A0F1A' : '#F8FAFC', borderTopColor: colors.borderLight }]}>
             <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
             <Text style={[styles.ficheFooterText, { color: colors.textMuted }]}>
-              237 Urgences - Fiche de signalement
+              {t('summary_footer')}
             </Text>
           </View>
         </View>
@@ -1110,8 +1161,7 @@ const styles = StyleSheet.create({
 
   // Map preview
   mapPreview: {
-    height: 160, overflow: 'hidden', borderRadius: 0,
-    justifyContent: 'center', alignItems: 'center',
+    height: 110, justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
   },
   mapGrid: { position: 'absolute', width: '100%', height: '100%' },
   mapGridRow: { flex: 1, flexDirection: 'row' },

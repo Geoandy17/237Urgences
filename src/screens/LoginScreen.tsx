@@ -5,33 +5,25 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { PhoneAuthProvider } from 'firebase/auth';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { useTheme } from '../config/theme';
 import { useI18n } from '../config/i18n';
-import { auth, firebaseConfig, getNativeAuth } from '../config/firebase';
-import { setConfirmationResult } from '../utils/nativeAuthState';
-
-// Recaptcha uniquement sur web
-let FirebaseRecaptchaVerifierModal: any = null;
-if (Platform.OS === 'web') {
-  FirebaseRecaptchaVerifierModal = require('../components/FirebaseRecaptcha').default;
-}
+import { useAuth } from '../config/auth';
+import { apiLogin } from '../services/api';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
-  route: RouteProp<RootStackParamList, 'Login'>;
 };
 
-export default function LoginScreen({ navigation, route }: Props) {
-  const { nom, prenom, email } = route.params || {};
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [sending, setSending] = useState(false);
-  const recaptchaVerifier = useRef<any>(null);
+export default function LoginScreen({ navigation }: Props) {
+  const [telephone, setTelephone] = useState('');
+  const [motDePasse, setMotDePasse] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { colors, mode } = useTheme();
   const { t } = useI18n();
+  const { login } = useAuth();
   const isDark = mode === 'dark';
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -39,31 +31,41 @@ export default function LoginScreen({ navigation, route }: Props) {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
   }, []);
 
-  const cleaned = phoneNumber.replace(/\s/g, '');
-  const canSend = cleaned.length >= 9 && !sending;
+  const cleaned = telephone.replace(/\s/g, '');
+  const canSubmit = cleaned.length >= 9 && motDePasse.length >= 8 && !loading;
 
-  const handleSendOTP = async () => {
-    if (!canSend) return;
-    setSending(true);
+  const handleLogin = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
     try {
       const fullPhone = `+237${cleaned}`;
+      const result = await apiLogin({
+        telephone: fullPhone,
+        motDePasse,
+      });
 
-      if (Platform.OS === 'web') {
-        // Web : utiliser le SDK JS Firebase avec reCAPTCHA
-        const verifier = recaptchaVerifier.current!;
-        const phoneProvider = new PhoneAuthProvider(auth);
-        const firebaseVerifier = verifier.getFirebaseVerifier();
-        const verificationId = await phoneProvider.verifyPhoneNumber(fullPhone, firebaseVerifier);
-        navigation.navigate('OTP', { phoneNumber: fullPhone, verificationId, nom, prenom, email });
+      if (result.success && result.data) {
+        await login(
+          {
+            userId: result.data.userId,
+            nom: result.data.nom,
+            prenom: result.data.prenom,
+            telephone: result.data.telephone,
+            role: result.data.role,
+          },
+          result.data.accessToken,
+          result.data.refreshToken,
+        );
+        // Navigation automatique via isLoggedIn = true
       } else {
-        // Native (Android/iOS) : utiliser @react-native-firebase/auth
-        const nativeAuth = getNativeAuth();
-        const confirmation = await nativeAuth().signInWithPhoneNumber(fullPhone);
-        setConfirmationResult(confirmation);
-        navigation.navigate('OTP', { phoneNumber: fullPhone, nom, prenom, email });
+        const msg = result.message || t('login_error');
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert(t('login_error'), msg);
+        }
       }
     } catch (err: any) {
-      console.error('SMS send error:', err);
       const msg = err?.message || t('login_error');
       if (Platform.OS === 'web') {
         window.alert(msg);
@@ -71,20 +73,13 @@ export default function LoginScreen({ navigation, route }: Props) {
         Alert.alert(t('login_error'), msg);
       }
     } finally {
-      setSending(false);
+      setLoading(false);
     }
   };
 
   return (
     <KeyboardAvoidingView style={[styles.container, { backgroundColor: colors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle={colors.statusBar} />
-
-      {Platform.OS === 'web' && FirebaseRecaptchaVerifierModal && (
-        <FirebaseRecaptchaVerifierModal
-          ref={recaptchaVerifier}
-          firebaseConfig={firebaseConfig}
-        />
-      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Animated.View style={{ opacity: fadeAnim }}>
@@ -101,12 +96,10 @@ export default function LoginScreen({ navigation, route }: Props) {
               </TouchableOpacity>
             </View>
             <View style={[styles.headerIcon, { backgroundColor: colors.warningLight }]}>
-              <Ionicons name="call" size={28} color={colors.warning} />
+              <Ionicons name="log-in" size={28} color={colors.warning} />
             </View>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{t('login_title')}</Text>
-            <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-              {prenom ? `${t('login_subtitle_hello')}${prenom} ! ` : ''}{t('login_subtitle_verify')}
-            </Text>
+            <Text style={[styles.headerSub, { color: colors.textSecondary }]}>{t('login_subtitle')}</Text>
           </View>
 
           {/* Carte formulaire */}
@@ -118,8 +111,9 @@ export default function LoginScreen({ navigation, route }: Props) {
             </View>
 
             <View style={styles.formInner}>
+              {/* Téléphone */}
               <Text style={[styles.label, { color: colors.textMuted }]}>{t('login_phone_label')}</Text>
-              <View style={[styles.phoneInputContainer, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+              <View style={[styles.phoneContainer, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
                 <View style={[styles.countryCode, { borderRightColor: colors.inputBorder, backgroundColor: isDark ? '#111' : '#F1F5F9' }]}>
                   <Text style={styles.flag}>🇨🇲</Text>
                   <Text style={[styles.countryCodeText, { color: colors.text }]}>+237</Text>
@@ -129,31 +123,52 @@ export default function LoginScreen({ navigation, route }: Props) {
                   placeholder={t('login_phone_placeholder')}
                   placeholderTextColor={colors.textMuted}
                   keyboardType="phone-pad" maxLength={12}
-                  value={phoneNumber} onChangeText={setPhoneNumber}
+                  value={telephone} onChangeText={setTelephone}
                   autoFocus
                 />
               </View>
 
-              <View style={[styles.infoRow, { backgroundColor: isDark ? '#0A0F1A' : '#F0F4FF' }]}>
-                <Ionicons name="information-circle" size={16} color={colors.accent} />
-                <Text style={[styles.infoText, { color: colors.textSecondary }]}>{t('login_sms_info')}</Text>
+              {/* Mot de passe */}
+              <Text style={[styles.label, { color: colors.textMuted }]}>{t('login_password_label')}</Text>
+              <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={{ marginLeft: 14 }} />
+                <TextInput
+                  style={[styles.input, { color: colors.text, flex: 1 }]}
+                  placeholder={t('login_password_placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                  value={motDePasse} onChangeText={setMotDePasse}
+                  secureTextEntry={!showPassword} autoCapitalize="none"
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ paddingRight: 14 }}>
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
 
-          {/* Bouton */}
+          {/* Bouton connexion */}
           <TouchableOpacity
-            style={[styles.btn, { backgroundColor: canSend ? '#CE1126' : isDark ? '#1A1A1A' : '#E2E8F0' }]}
-            onPress={handleSendOTP} disabled={!canSend} activeOpacity={0.85}
+            style={[styles.btn, { backgroundColor: canSubmit ? '#CE1126' : isDark ? '#1A1A1A' : '#E2E8F0' }]}
+            onPress={handleLogin} disabled={!canSubmit} activeOpacity={0.85}
           >
-            {sending ? (
+            {loading ? (
               <ActivityIndicator size="small" color="#FFF" />
             ) : (
               <>
-                <Text style={[styles.btnText, { color: canSend ? '#FFF' : colors.textMuted }]}>{t('login_send_code')}</Text>
-                <Ionicons name="arrow-forward" size={18} color={canSend ? '#FFF' : colors.textMuted} />
+                <Text style={[styles.btnText, { color: canSubmit ? '#FFF' : colors.textMuted }]}>{t('login_submit')}</Text>
+                <Ionicons name="arrow-forward" size={18} color={canSubmit ? '#FFF' : colors.textMuted} />
               </>
             )}
+          </TouchableOpacity>
+
+          {/* Lien vers register */}
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('Register')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.linkText, { color: colors.textSecondary }]}>{t('login_no_account')} </Text>
+            <Text style={[styles.linkBold, { color: colors.accent }]}>{t('login_register_link')}</Text>
           </TouchableOpacity>
 
         </Animated.View>
@@ -191,7 +206,8 @@ const styles = StyleSheet.create({
   tri: { flex: 1 },
   formInner: { padding: 22 },
   label: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
-  phoneInputContainer: {
+
+  phoneContainer: {
     flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 14,
   },
   countryCode: {
@@ -200,15 +216,23 @@ const styles = StyleSheet.create({
   flag: { fontSize: 18 },
   countryCodeText: { fontSize: 15, fontWeight: '600' },
   phoneInput: { flex: 1, paddingHorizontal: 14, paddingVertical: 15, fontSize: 17, letterSpacing: 1 },
-  infoRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12,
+
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 14,
   },
-  infoText: { fontSize: 12, flex: 1, lineHeight: 17 },
+  input: { flex: 1, paddingHorizontal: 12, paddingVertical: 15, fontSize: 15 },
 
   btn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     marginHorizontal: 20, marginTop: 24, paddingVertical: 17, borderRadius: 16, gap: 10,
   },
   btnText: { fontSize: 16, fontWeight: '700' },
+
+  linkRow: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    marginTop: 18, paddingVertical: 8,
+  },
+  linkText: { fontSize: 14 },
+  linkBold: { fontSize: 14, fontWeight: '700' },
 });

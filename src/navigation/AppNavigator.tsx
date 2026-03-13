@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList, MainTabParamList } from '../types';
 import { useTheme } from '../config/theme';
 import { useI18n } from '../config/i18n';
@@ -15,11 +16,14 @@ import RegisterScreen from '../screens/RegisterScreen';
 import LoginScreen from '../screens/LoginScreen';
 import OTPScreen from '../screens/OTPScreen';
 import HomeScreen from '../screens/HomeScreen';
+import ServicesScreen from '../screens/ServicesScreen';
 import EmergencyCallScreen from '../screens/EmergencyCallScreen';
 import HospitalsScreen from '../screens/HospitalsScreen';
 import PharmaciesScreen from '../screens/PharmaciesScreen';
 import DeclareIncidentScreen from '../screens/DeclareIncidentScreen';
 import IncidentConfirmationScreen from '../screens/IncidentConfirmationScreen';
+import IncidentTrackingScreen from '../screens/IncidentTrackingScreen';
+import MyIncidentsScreen from '../screens/MyIncidentsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -29,6 +33,9 @@ function MainTabs() {
   const { colors, mode } = useTheme();
   const { t } = useI18n();
   const isDark = mode === 'dark';
+  const insets = useSafeAreaInsets();
+
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0);
 
   return (
     <Tab.Navigator
@@ -37,10 +44,9 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: isDark ? '#0A0A0A' : '#FFFFFF',
           borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
-          paddingTop: 8,
-          // Shadow
+          height: 62 + bottomInset,
+          paddingBottom: bottomInset,
+          paddingTop: 6,
           shadowColor: isDark ? '#000' : '#64748B',
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: isDark ? 0.3 : 0.08,
@@ -57,13 +63,12 @@ function MainTabs() {
         tabBarIcon: ({ focused, color }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'home';
           if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
-          else if (route.name === 'Profile') iconName = focused ? 'person-circle' : 'person-circle-outline';
+          else if (route.name === 'Services') iconName = focused ? 'grid' : 'grid-outline';
+          else if (route.name === 'MyIncidents') iconName = focused ? 'notifications' : 'notifications-outline';
+          else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
 
           return (
-            <View style={{
-              alignItems: 'center',
-              paddingTop: 2,
-            }}>
+            <View style={{ alignItems: 'center', paddingTop: 2 }}>
               {focused && (
                 <View style={{
                   position: 'absolute', top: -8,
@@ -71,14 +76,16 @@ function MainTabs() {
                   backgroundColor: colors.accent,
                 }} />
               )}
-              <Ionicons name={iconName} size={focused ? 26 : 24} color={color} />
+              <Ionicons name={iconName} size={focused ? 24 : 22} color={color} />
             </View>
           );
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Accueil' }} />
-      <Tab.Screen name="Profile" component={SettingsScreen} options={{ tabBarLabel: t('settings_title') }} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: t('tab_home') }} />
+      <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: t('tab_services') }} />
+      <Tab.Screen name="MyIncidents" component={MyIncidentsScreen} options={{ tabBarLabel: t('tab_incidents') }} />
+      <Tab.Screen name="Profile" component={SettingsScreen} options={{ tabBarLabel: t('tab_profile') }} />
     </Tab.Navigator>
   );
 }
@@ -99,7 +106,6 @@ export default function AppNavigator() {
     },
   };
 
-  // Écran de chargement pendant la vérification de session
   if (isLoading) {
     return (
       <View style={[styles.loading, { backgroundColor: colors.background }]}>
@@ -120,7 +126,6 @@ export default function AppNavigator() {
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isLoggedIn ? (
-          // Utilisateur connecté → accès direct
           <>
             <Stack.Screen name="MainTabs" component={MainTabs} />
             <Stack.Screen name="EmergencyCall" component={EmergencyCallScreen} />
@@ -128,9 +133,10 @@ export default function AppNavigator() {
             <Stack.Screen name="Pharmacies" component={PharmaciesScreen} />
             <Stack.Screen name="DeclareIncident" component={DeclareIncidentScreen} />
             <Stack.Screen name="IncidentConfirmation" component={IncidentConfirmationScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="IncidentTracking" component={IncidentTrackingScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
           </>
         ) : (
-          // Pas connecté → Splash → Welcome → Register/Login → OTP
           <>
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ animation: 'fade' }} />

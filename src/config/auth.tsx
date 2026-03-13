@@ -1,22 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
-import { Platform } from 'react-native';
-import { db, auth, getNativeAuth } from './firebase';
-
-interface UserData {
-  phoneNumber: string;
-  nom: string;
-  prenom: string;
-  email?: string;
-}
+import { UserData } from '../types';
+import { saveTokens, clearTokens, getAccessToken, apiLogout, apiGetProfil, setOnSessionExpired } from '../services/api';
 
 interface AuthContextType {
   user: UserData | null;
   isLoading: boolean;
   isLoggedIn: boolean;
-  login: (userData: UserData) => Promise<void>;
+  login: (userData: UserData, accessToken: string, refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<UserData>) => Promise<void>;
 }
@@ -36,16 +27,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Au lancement : vérifier si une session existe
+  // Au lancement : vérifier si une session existe + enregistrer le callback d'expiration
   useEffect(() => {
     loadUser();
+    setOnSessionExpired(() => {
+      // Session expirée côté serveur → forcer la déconnexion locale
+      setUser(null);
+      AsyncStorage.removeItem(USER_STORAGE_KEY).catch(() => {});
+    });
   }, []);
 
   const loadUser = async () => {
     try {
+      const token = await getAccessToken();
       const stored = await AsyncStorage.getItem(USER_STORAGE_KEY);
-      if (stored) {
+      if (token && stored) {
         setUser(JSON.parse(stored));
+      } else if (!token) {
+        // Pas de token = pas de session
+        await AsyncStorage.removeItem(USER_STORAGE_KEY);
       }
     } catch {
       // Pas de session sauvegardée
@@ -53,35 +53,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   };
 
-  const login = async (userData: UserData) => {
-    // Sauvegarder en local (session offline)
+  const login = async (userData: UserData, accessToken: string, refreshToken: string) => {
+    // Sauvegarder les tokens JWT
+    await saveTokens(accessToken, refreshToken);
+    // Sauvegarder le profil en local
     await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
     setUser(userData);
-    // Sauvegarder le profil dans Firestore seulement si on a un vrai nom
-    // (éviter d'écraser un profil existant avec des données vides)
-    if (userData.nom || userData.prenom) {
-      try {
-        const userRef = doc(db, 'users', userData.phoneNumber);
-        await setDoc(userRef, {
-          ...userData,
-          createdAt: new Date().toISOString(),
-        }, { merge: true });
-      } catch (e) {
-        console.warn('Firestore save failed (offline?):', e);
-      }
-    }
   };
 
   const logout = async () => {
-    // Réinitialiser le state immédiatement pour rediriger
+    // Réinitialiser le state immédiatement
     setUser(null);
     // Nettoyer en arrière-plan
-    AsyncStorage.removeItem(USER_STORAGE_KEY).catch(() => {});
-    signOut(auth).catch(() => {});
-    // Déconnecter aussi le SDK natif Firebase sur mobile
-    if (Platform.OS !== 'web') {
-      try { getNativeAuth()?.().signOut(); } catch {}
-    }
+    try { await apiLogout(); } catch {}
+    await AsyncStorage.removeItem(USER_STORAGE_KEY);
+    await clearTokens();
   };
 
   const updateUser = async (partial: Partial<UserData>) => {
@@ -89,13 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updated = { ...user, ...partial };
     await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updated));
     setUser(updated);
-    // Sync Firestore
-    try {
-      const userRef = doc(db, 'users', updated.phoneNumber);
-      await setDoc(userRef, updated, { merge: true });
-    } catch (e) {
-      console.warn('Firestore update failed (offline?):', e);
-    }
   };
 
   return (
@@ -106,20 +85,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-
-/**
- * Vérifie si un utilisateur existe déjà dans Firestore.
- * Retourne ses données si oui, null sinon.
- */
-export async function checkUserExists(phoneNumber: string): Promise<UserData | null> {
-  try {
-    const userRef = doc(db, 'users', phoneNumber);
-    const snap = await getDoc(userRef);
-    if (snap.exists()) {
-      return snap.data() as UserData;
-    }
-  } catch (e) {
-    console.warn('Firestore check failed:', e);
-  }
-  return null;
-}

@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, StatusBar, ScrollView, Animated,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { useTheme } from '../config/theme';
 import { useI18n } from '../config/i18n';
+import { useAuth } from '../config/auth';
+import { apiRegister } from '../services/api';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Register'>;
@@ -16,9 +19,15 @@ type Props = {
 export default function RegisterScreen({ navigation }: Props) {
   const [nom, setNom] = useState('');
   const [prenom, setPrenom] = useState('');
+  const [telephone, setTelephone] = useState('');
   const [email, setEmail] = useState('');
+  const [motDePasse, setMotDePasse] = useState('');
+  const [confirmMdp, setConfirmMdp] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { colors, mode } = useTheme();
   const { t } = useI18n();
+  const { login } = useAuth();
   const isDark = mode === 'dark';
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -26,11 +35,63 @@ export default function RegisterScreen({ navigation }: Props) {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
   }, []);
 
-  const canContinue = nom.trim().length > 0 && prenom.trim().length > 0;
+  const cleaned = telephone.replace(/\s/g, '');
+  const canSubmit =
+    nom.trim().length > 0 &&
+    prenom.trim().length > 0 &&
+    cleaned.length >= 9 &&
+    motDePasse.length >= 8 &&
+    motDePasse === confirmMdp &&
+    !loading;
+
+  const handleRegister = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
+    try {
+      const fullPhone = `+237${cleaned}`;
+
+      // Inscription directe via API (mot de passe, pas d'OTP)
+      const result = await apiRegister({
+        nom: nom.trim(),
+        prenom: prenom.trim(),
+        telephone: fullPhone,
+        email: email.trim() || undefined,
+        motDePasse,
+      });
+      if (result.success && result.data) {
+        await login(
+          {
+            userId: result.data.userId,
+            nom: result.data.nom,
+            prenom: result.data.prenom,
+            telephone: result.data.telephone,
+            role: result.data.role,
+          },
+          result.data.accessToken,
+          result.data.refreshToken,
+        );
+      } else {
+        const msg = result.message || t('error');
+        if (Platform.OS === 'web') window.alert(msg);
+        else Alert.alert(t('error'), msg);
+      }
+    } catch (err: any) {
+      console.error('Register error:', err);
+      const msg = err?.message || t('error');
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert(t('error'), msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView style={[styles.container, { backgroundColor: colors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle={colors.statusBar} />
+
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Animated.View style={{ opacity: fadeAnim }}>
 
@@ -87,6 +148,22 @@ export default function RegisterScreen({ navigation }: Props) {
                 />
               </View>
 
+              {/* Téléphone */}
+              <Text style={[styles.label, { color: colors.textMuted }]}>{t('login_phone_label')} *</Text>
+              <View style={[styles.phoneContainer, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                <View style={[styles.countryCode, { borderRightColor: colors.inputBorder, backgroundColor: isDark ? '#111' : '#F1F5F9' }]}>
+                  <Text style={styles.flag}>🇨🇲</Text>
+                  <Text style={[styles.countryCodeText, { color: colors.text }]}>+237</Text>
+                </View>
+                <TextInput
+                  style={[styles.phoneInput, { color: colors.text }]}
+                  placeholder={t('login_phone_placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="phone-pad" maxLength={12}
+                  value={telephone} onChangeText={setTelephone}
+                />
+              </View>
+
               {/* Email */}
               <Text style={[styles.label, { color: colors.textMuted }]}>{t('profile_email')}</Text>
               <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
@@ -99,17 +176,69 @@ export default function RegisterScreen({ navigation }: Props) {
                   keyboardType="email-address" autoCapitalize="none"
                 />
               </View>
+
+              {/* Mot de passe */}
+              <Text style={[styles.label, { color: colors.textMuted }]}>{t('register_password')} *</Text>
+              <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={{ marginLeft: 14 }} />
+                <TextInput
+                  style={[styles.input, { color: colors.text, flex: 1 }]}
+                  placeholder={t('register_password_placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                  value={motDePasse} onChangeText={setMotDePasse}
+                  secureTextEntry={!showPassword} autoCapitalize="none"
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ paddingRight: 14 }}>
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Confirmer mot de passe */}
+              <Text style={[styles.label, { color: colors.textMuted }]}>{t('register_confirm_password')} *</Text>
+              <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={{ marginLeft: 14 }} />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder={t('register_confirm_password_placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                  value={confirmMdp} onChangeText={setConfirmMdp}
+                  secureTextEntry={!showPassword} autoCapitalize="none"
+                />
+              </View>
+
+              {motDePasse.length > 0 && motDePasse.length < 8 && (
+                <Text style={[styles.hint, { color: colors.warning }]}>{t('register_password_min')}</Text>
+              )}
+              {confirmMdp.length > 0 && motDePasse !== confirmMdp && (
+                <Text style={[styles.hint, { color: colors.danger }]}>{t('register_password_mismatch')}</Text>
+              )}
             </View>
           </View>
 
-          {/* Bouton continuer */}
+          {/* Bouton créer le compte */}
           <TouchableOpacity
-            style={[styles.btn, { backgroundColor: canContinue ? colors.accent : isDark ? '#1A1A1A' : '#E2E8F0' }]}
-            onPress={() => navigation.navigate('Login', { nom: nom.trim(), prenom: prenom.trim(), email: email.trim() || undefined })}
-            disabled={!canContinue} activeOpacity={0.85}
+            style={[styles.btn, { backgroundColor: canSubmit ? '#009639' : isDark ? '#1A1A1A' : '#E2E8F0' }]}
+            onPress={handleRegister}
+            disabled={!canSubmit} activeOpacity={0.85}
           >
-            <Text style={[styles.btnText, { color: canContinue ? '#FFF' : colors.textMuted }]}>{t('register_continue')}</Text>
-            <Ionicons name="arrow-forward" size={18} color={canContinue ? '#FFF' : colors.textMuted} />
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <>
+                <Text style={[styles.btnText, { color: canSubmit ? '#FFF' : colors.textMuted }]}>{t('register_create_account')}</Text>
+                <Ionicons name="checkmark-circle" size={20} color={canSubmit ? '#FFF' : colors.textMuted} />
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Lien vers login */}
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('Login')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.linkText, { color: colors.textSecondary }]}>{t('register_have_account')} </Text>
+            <Text style={[styles.linkBold, { color: colors.accent }]}>{t('register_login_link')}</Text>
           </TouchableOpacity>
 
         </Animated.View>
@@ -159,9 +288,28 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, paddingHorizontal: 12, paddingVertical: 15, fontSize: 15 },
 
+  phoneContainer: {
+    flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 14,
+  },
+  countryCode: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 15, borderRightWidth: 1, gap: 6,
+  },
+  flag: { fontSize: 18 },
+  countryCodeText: { fontSize: 15, fontWeight: '600' },
+  phoneInput: { flex: 1, paddingHorizontal: 14, paddingVertical: 15, fontSize: 17, letterSpacing: 1 },
+
+  hint: { fontSize: 12, marginTop: -8, marginBottom: 8, marginLeft: 4 },
+
   btn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     marginHorizontal: 20, marginTop: 24, paddingVertical: 17, borderRadius: 16, gap: 10,
   },
   btnText: { fontSize: 16, fontWeight: '700' },
+
+  linkRow: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    marginTop: 18, paddingVertical: 8,
+  },
+  linkText: { fontSize: 14 },
+  linkBold: { fontSize: 14, fontWeight: '700' },
 });

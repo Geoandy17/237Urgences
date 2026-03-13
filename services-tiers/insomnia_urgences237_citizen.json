@@ -1,0 +1,341 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-03-12",
+  "__export_source": "urgences237.citizen-api",
+  "resources": [
+
+    {
+      "_id": "env_citizen_base",
+      "_type": "environment",
+      "parentId": "wrk_citizen",
+      "name": "Préprod — Citoyen",
+      "data": {
+        "base_url": "http://localhost:8080/api",
+        "token": "",
+        "refresh_token": "",
+        "incident_ref": "REF-237-0001",
+        "incident_id": "1"
+      },
+      "color": "#E53E3E"
+    },
+
+    {
+      "_id": "wrk_citizen",
+      "_type": "workspace",
+      "name": "URGENCES 237 — App Citoyenne",
+      "description": "Collection Insomnia — endpoints utilisés par l'application mobile citoyenne",
+      "scope": "collection"
+    },
+
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_citizen",
+      "name": "🔐 Authentification",
+      "description": "Inscription, connexion, refresh token, déconnexion"
+    },
+
+    {
+      "_id": "req_register",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Inscription — nouveau citoyen",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/register",
+      "description": "Crée un compte citoyen. Mot de passe min. 8 caractères. Téléphone format +237XXXXXXXXX.",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nom\": \"Atangana\",\n  \"prenom\": \"Marie-Claire\",\n  \"telephone\": \"+237691000001\",\n  \"email\": \"marie.atangana@test.cm\",\n  \"motDePasse\": \"Citoyen237!\"\n}"
+      }
+    },
+
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Connexion",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/login",
+      "description": "Retourne un JWT (token) et un refresh token. Copier le token dans la variable d'environnement 'token'.",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"telephone\": \"+237691000001\",\n  \"motDePasse\": \"Citoyen237!\"\n}"
+      }
+    },
+
+    {
+      "_id": "req_refresh",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Refresh token",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/refresh",
+      "description": "Renouvelle le JWT à partir du refresh token (valide 7 jours). Passer le refresh token en body texte brut.",
+      "headers": [
+        { "name": "Content-Type", "value": "text/plain" }
+      ],
+      "body": {
+        "mimeType": "text/plain",
+        "text": "{{ refresh_token }}"
+      }
+    },
+
+    {
+      "_id": "req_logout",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Déconnexion",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/logout",
+      "description": "Invalide le token côté serveur.",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "body": { "mimeType": "application/json", "text": "" }
+    },
+
+    {
+      "_id": "fld_profil",
+      "_type": "request_group",
+      "parentId": "wrk_citizen",
+      "name": "👤 Profil",
+      "description": "Consultation et modification du profil citoyen connecté"
+    },
+
+    {
+      "_id": "req_get_profil",
+      "_type": "request",
+      "parentId": "fld_profil",
+      "name": "Consulter mon profil",
+      "method": "GET",
+      "url": "{{ base_url }}/profil",
+      "description": "Retourne les infos du citoyen connecté : nom, prénom, téléphone, email, total signalements.",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+
+    {
+      "_id": "req_update_profil",
+      "_type": "request",
+      "parentId": "fld_profil",
+      "name": "Modifier nom / prénom / email",
+      "method": "PUT",
+      "url": "{{ base_url }}/profil",
+      "description": "Met à jour les informations personnelles. Email doit être unique.",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nom\": \"Atangana\",\n  \"prenom\": \"Marie-Claire\",\n  \"email\": \"marie.atangana@nouveau.cm\"\n}"
+      }
+    },
+
+    {
+      "_id": "req_update_telephone",
+      "_type": "request",
+      "parentId": "fld_profil",
+      "name": "Modifier numéro de téléphone",
+      "method": "PATCH",
+      "url": "{{ base_url }}/profil/telephone?telephone=%2B237691000099",
+      "description": "Change le numéro de téléphone. Doit être unique. Format : +237XXXXXXXXX (encoder le + en %2B dans l'URL).",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+
+    {
+      "_id": "req_change_password",
+      "_type": "request",
+      "parentId": "fld_profil",
+      "name": "Changer le mot de passe",
+      "method": "PATCH",
+      "url": "{{ base_url }}/profil/mot-de-passe",
+      "description": "Nécessite l'ancien mot de passe. Nouveau mot de passe min. 8 caractères.",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"ancienMotDePasse\": \"Citoyen237!\",\n  \"nouveauMotDePasse\": \"NouveauMdp237!\"\n}"
+      }
+    },
+
+    {
+      "_id": "fld_signalement",
+      "_type": "request_group",
+      "parentId": "wrk_citizen",
+      "name": "🚨 Signalement d'urgence",
+      "description": "Créer une alerte — avec ou sans médias"
+    },
+
+    {
+      "_id": "req_signaler_json",
+      "_type": "request",
+      "parentId": "fld_signalement",
+      "name": "Signaler une urgence (JSON simple)",
+      "method": "POST",
+      "url": "{{ base_url }}/incidents",
+      "description": "Signalement texte pur, sans média. Fonctionne pour les utilisateurs anonymes (sans token) ou connectés. Le token est optionnel — s'il est présent, le signalement est rattaché au compte.",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"typeUrgence\": \"INCENDIE\",\n  \"niveauGravite\": \"GRAVE\",\n  \"description\": \"Incendie en cours dans un immeuble R+4, 3e étage. Occupants encore présents. Fumée noire visible depuis la rue.\",\n  \"telephoneContact\": \"+237691000001\",\n  \"nombreVictimesEstime\": 0,\n  \"region\": \"CENTRE\",\n  \"ville\": \"Yaoundé\",\n  \"quartier\": \"Bastos\",\n  \"adresseComplete\": \"Rue Bastos, Résidence Les Palmiers\",\n  \"latitude\": 3.8780,\n  \"longitude\": 11.5340,\n  \"estTemoin\": true\n}"
+      }
+    },
+
+    {
+      "_id": "req_signaler_multipart",
+      "_type": "request",
+      "parentId": "fld_signalement",
+      "name": "Signaler avec photo(s) et/ou audio — multipart",
+      "method": "POST",
+      "url": "{{ base_url }}/incidents/avec-photo",
+      "description": "Signalement avec médias. Le champ 'data' contient le JSON du signalement (même structure que l'endpoint JSON simple). Les champs 'photos' (0-3 fichiers) et 'audio' (1 fichier) sont optionnels. Content-Type multipart/form-data géré automatiquement par Insomnia.",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          {
+            "name": "data",
+            "value": "{\"typeUrgence\":\"ACCIDENT_ROUTE\",\"niveauGravite\":\"GRAVE\",\"description\":\"Collision frontale entre deux véhicules. Deux blessés visibles, un coincé dans l'habitacle.\",\"telephoneContact\":\"+237691000001\",\"region\":\"LITTORAL\",\"ville\":\"Douala\",\"quartier\":\"Akwa\",\"adresseComplete\":\"Boulevard de la Liberté, face station Total\",\"latitude\":4.0511,\"longitude\":9.7679,\"estTemoin\":true}",
+            "type": "text"
+          },
+          {
+            "name": "photos",
+            "fileName": "",
+            "type": "file",
+            "disabled": true,
+            "description": "Photo 1 — optionnel (jpg/png, max 20MB)"
+          },
+          {
+            "name": "photos",
+            "fileName": "",
+            "type": "file",
+            "disabled": true,
+            "description": "Photo 2 — optionnel"
+          },
+          {
+            "name": "audio",
+            "fileName": "",
+            "type": "file",
+            "disabled": true,
+            "description": "Note vocale — optionnel (webm/mp3, max 20MB)"
+          }
+        ]
+      }
+    },
+
+    {
+      "_id": "fld_suivi",
+      "_type": "request_group",
+      "parentId": "wrk_citizen",
+      "name": "📍 Suivi d'incidents",
+      "description": "Suivre l'état d'un incident et consulter l'historique de ses signalements"
+    },
+
+    {
+      "_id": "req_suivi_reference",
+      "_type": "request",
+      "parentId": "fld_suivi",
+      "name": "Suivre un incident par référence (public)",
+      "method": "GET",
+      "url": "{{ base_url }}/incidents/suivi/{{ incident_ref }}",
+      "description": "Accès public — aucun token requis. Retourne le statut en temps réel, l'unité assignée et l'historique des transitions. La référence est fournie par SMS à la création (ex: REF-237-0001).",
+      "headers": []
+    },
+
+    {
+      "_id": "req_mes_incidents",
+      "_type": "request",
+      "parentId": "fld_suivi",
+      "name": "Mes signalements (citoyen connecté)",
+      "method": "GET",
+      "url": "{{ base_url }}/incidents/mes-incidents?page=0&size=10",
+      "description": "Liste paginée des incidents signalés par le compte connecté, du plus récent au plus ancien.",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+
+    {
+      "_id": "fld_medias",
+      "_type": "request_group",
+      "parentId": "wrk_citizen",
+      "name": "📎 Médias",
+      "description": "Ajouter des photos à un incident existant et accéder aux fichiers"
+    },
+
+    {
+      "_id": "req_upload_medias",
+      "_type": "request",
+      "parentId": "fld_medias",
+      "name": "Ajouter des photos à un incident",
+      "method": "POST",
+      "url": "{{ base_url }}/incidents/{{ incident_id }}/medias",
+      "description": "Ajoute des médias à un incident déjà créé. Utiliser l'id numérique de l'incident (retourné lors du signalement). Plusieurs fichiers acceptés.",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          {
+            "name": "fichiers",
+            "fileName": "",
+            "type": "file",
+            "description": "Photo ou audio — répéter le champ pour plusieurs fichiers"
+          }
+        ]
+      }
+    },
+
+    {
+      "_id": "req_get_media",
+      "_type": "request",
+      "parentId": "fld_medias",
+      "name": "Accéder à un fichier média (Bearer)",
+      "method": "GET",
+      "url": "{{ base_url }}/medias/incidents/REF-237-0001/photo1.jpg",
+      "description": "Télécharge ou affiche un fichier média lié à un incident. Le chemin est : /medias/incidents/{reference}/{nomFichier}. Remplacer REF-237-0001 et photo1.jpg par les valeurs réelles retournées dans l'objet incident (champ medias[].url).",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+
+    {
+      "_id": "fld_types",
+      "_type": "request_group",
+      "parentId": "wrk_citizen",
+      "name": "📋 Référentiels",
+      "description": "Valeurs acceptées par l'API — à intégrer dans les sélecteurs de l'app"
+    },
+
+    {
+      "_id": "req_types_note",
+      "_type": "request",
+      "parentId": "fld_types",
+      "name": "⚠️ Valeurs des enums — lire la description",
+      "method": "GET",
+      "url": "{{ base_url }}/actuator/health",
+      "description": "Pas d'endpoint dédié pour les listes — les valeurs sont fixées dans le backend.\n\ntypeUrgence :\n  INCENDIE | AGRESSION | ACCIDENT_ROUTE | URGENCE_MEDICALE | CATASTROPHE_NATURELLE | AUTRE\n\nniveauGravite (optionnel — MODEREE par défaut) :\n  LEGERE | MODEREE | GRAVE | CRITIQUE\n\nregion :\n  ADAMAOUA | CENTRE | EST | EXTREME_NORD | LITTORAL | NORD | NORD_OUEST | OUEST | SUD | SUD_OUEST\n\nStatuts incident (lecture seule) :\n  ALERTE → ASSIGNE → EN_ROUTE → SUR_PLACE → EN_COURS → RESOLU → CLOS | ANNULE",
+      "headers": []
+    }
+
+  ]
+}

@@ -25,13 +25,26 @@ const translations = {
     register_step_otp: 'Vérification',
     register_info_title: 'Vos informations',
     register_continue: 'Continuer',
+    register_password: 'Mot de passe',
+    register_password_placeholder: '8 caractères minimum',
+    register_confirm_password: 'Confirmer le mot de passe',
+    register_confirm_password_placeholder: 'Retapez votre mot de passe',
+    register_password_min: 'Le mot de passe doit contenir au moins 8 caractères',
+    register_password_mismatch: 'Les mots de passe ne correspondent pas',
+    register_create_account: 'Créer mon compte',
+    register_have_account: 'Déjà un compte ?',
+    register_login_link: 'Se connecter',
 
     // Login
-    login_title: 'Vérification du numéro',
+    login_title: 'Connexion',
+    login_subtitle: 'Connectez-vous à votre compte',
     login_subtitle_hello: 'Bonjour ',
     login_subtitle_verify: 'Vérifiez votre numéro de téléphone.',
     login_phone_label: 'Numéro de téléphone',
     login_phone_placeholder: '6XX XXX XXX',
+    login_password_label: 'Mot de passe',
+    login_password_placeholder: 'Votre mot de passe',
+    login_submit: 'Se connecter',
     login_send_code: 'Envoyer le code SMS',
     login_sms_info: 'Un code de vérification à 6 chiffres sera envoyé par SMS à ce numéro.',
     login_disclaimer: 'En continuant, vous acceptez nos conditions d\'utilisation et notre politique de confidentialité.',
@@ -39,6 +52,8 @@ const translations = {
     login_otp_sent_msg: 'Un code de vérification a été envoyé au',
     login_error: 'Erreur',
     login_invalid_phone: 'Veuillez entrer un numéro de téléphone valide (9 chiffres)',
+    login_no_account: 'Pas encore de compte ?',
+    login_register_link: 'Créer un compte',
 
     // OTP
     otp_title: 'Vérification OTP',
@@ -193,6 +208,11 @@ const translations = {
     home_card_action: 'Faire un signalement',
     home_emergency_short: 'N. urgence',
     home_user_default: 'Utilisateur',
+    home_police: 'Police',
+    home_fire: 'Pompiers',
+    home_recent_incidents: 'Derniers signalements',
+    home_see_all: 'Voir tout',
+    home_card_info_desc: 'Utilisez le bouton + pour signaler un incident aux services d\'urgence.',
 
     // Declare Incident hardcoded
     incident_type_label: 'Type d\'incident',
@@ -236,6 +256,95 @@ const translations = {
     confirm_home: 'Retour à l\'accueil',
     confirm_new: 'Nouveau signalement',
 
+    // Tracking
+    tracking_title: 'Suivi d\'incident',
+    tracking_reference: 'Référence',
+    tracking_status: 'Statut',
+    tracking_unit: 'Unité assignée',
+    tracking_unit_none: 'En attente d\'assignation',
+    tracking_call_standard: 'Appeler le standard',
+    tracking_call_chef: 'Appeler le chef',
+    tracking_history: 'Historique',
+    tracking_created: 'Signalement créé',
+    tracking_copy: 'Copier la référence',
+    tracking_copied: 'Référence copiée !',
+    tracking_refresh: 'Actualiser',
+    tracking_loading: 'Chargement...',
+    tracking_error: 'Impossible de charger l\'incident',
+    tracking_medias: 'Photos et audio',
+    tracking_no_medias: 'Aucun média joint',
+    tracking_play_audio: 'Écouter le message vocal',
+    tracking_stop_audio: 'Arrêter la lecture',
+    tracking_timeline: 'Chronologie',
+    tracking_assigned_at: 'Assignation',
+    tracking_arrived_at: 'Arrivée sur les lieux',
+    tracking_resolved_at: 'Résolution',
+    tracking_just_now: 'À l\'instant',
+    tracking_last_update: 'Dernière MAJ',
+    tracking_map_incident: 'Votre signalement',
+    tracking_map_unit: 'Unité d\'intervention',
+
+    // My Incidents
+    my_incidents_title: 'Mes signalements',
+    my_incidents_empty: 'Aucun signalement pour le moment',
+    my_incidents_empty_desc: 'Vos signalements apparaîtront ici',
+
+    // Statuts
+    status_ALERTE: 'Alerte',
+    status_ASSIGNE: 'Assigné',
+    status_EN_ROUTE: 'En route',
+    status_SUR_PLACE: 'Sur place',
+    status_EN_COURS: 'En cours',
+    status_RESOLU: 'Résolu',
+    status_CLOS: 'Clos',
+    status_ANNULE: 'Annulé',
+
+    // Confirm updated
+    confirm_track: 'Suivre mon incident',
+
+    // Summary (step 3)
+    summary_declarant: 'Déclarant',
+    summary_type_label: 'TYPE D\'INCIDENT',
+    summary_description: 'DESCRIPTION',
+    summary_voice: 'MESSAGE VOCAL',
+    summary_voice_recording: 'Enregistrement',
+    summary_location: 'LOCALISATION',
+    summary_contact: 'CONTACT',
+    summary_footer: '237 Urgences - Fiche de signalement',
+
+    // Home - Mes signalements
+    home_my_incidents: 'Mes signalements',
+
+    // Tab labels
+    tab_home: 'Accueil',
+    tab_incidents: 'Signalements',
+    tab_profile: 'Profil',
+
+    // Services screen
+    services_title: 'Services',
+    services_emergency_numbers: 'Numéros d\'urgence',
+    services_nearby: 'À proximité',
+    services_emergency_general: 'Urgences générales',
+    services_police: 'Police',
+    services_fire: 'Pompiers',
+    services_dev_banner: 'Module en cours de développement — données indicatives',
+
+    // Tab labels updated
+    tab_services: 'Services',
+
+    // Home SOS redesign
+    home_sos: 'SOS',
+    home_sos_subtitle: 'Signaler une urgence',
+    home_quick_type: 'Type d\'urgence',
+    home_active_incident: 'Urgence en cours',
+    home_no_active: 'Aucune urgence active',
+    home_location: 'Votre position',
+    home_location_active: 'GPS actif',
+    home_location_searching: 'Recherche...',
+    home_identity: 'Citoyen identifié',
+    home_no_services: 'Aucun service disponible',
+    home_no_services_desc: 'Les services de santé proches de vous seront bientôt disponibles',
+
     // Common
     ok: 'OK',
     cancel: 'Annuler',
@@ -268,13 +377,26 @@ const translations = {
     register_step_otp: 'Verify',
     register_info_title: 'Your information',
     register_continue: 'Continue',
+    register_password: 'Password',
+    register_password_placeholder: '8 characters minimum',
+    register_confirm_password: 'Confirm password',
+    register_confirm_password_placeholder: 'Re-enter your password',
+    register_password_min: 'Password must be at least 8 characters',
+    register_password_mismatch: 'Passwords do not match',
+    register_create_account: 'Create my account',
+    register_have_account: 'Already have an account?',
+    register_login_link: 'Log in',
 
     // Login
-    login_title: 'Phone verification',
+    login_title: 'Log in',
+    login_subtitle: 'Log in to your account',
     login_subtitle_hello: 'Hello ',
     login_subtitle_verify: 'Verify your phone number.',
     login_phone_label: 'Phone number',
     login_phone_placeholder: '6XX XXX XXX',
+    login_password_label: 'Password',
+    login_password_placeholder: 'Your password',
+    login_submit: 'Log in',
     login_send_code: 'Send SMS code',
     login_sms_info: 'A 6-digit verification code will be sent by SMS to this number.',
     login_disclaimer: 'By continuing, you accept our terms of use and privacy policy.',
@@ -282,6 +404,8 @@ const translations = {
     login_otp_sent_msg: 'A verification code has been sent to',
     login_error: 'Error',
     login_invalid_phone: 'Please enter a valid phone number (9 digits)',
+    login_no_account: 'Don\'t have an account?',
+    login_register_link: 'Create an account',
 
     // OTP
     otp_title: 'OTP Verification',
@@ -436,6 +560,11 @@ const translations = {
     home_card_action: 'Make a report',
     home_emergency_short: 'Emergency',
     home_user_default: 'User',
+    home_police: 'Police',
+    home_fire: 'Firefighters',
+    home_recent_incidents: 'Recent reports',
+    home_see_all: 'See all',
+    home_card_info_desc: 'Use the + button to report an incident to emergency services.',
 
     // Declare Incident hardcoded
     incident_type_label: 'Incident type',
@@ -478,6 +607,95 @@ const translations = {
     confirm_footer: '237 Urgences - Report transmitted',
     confirm_home: 'Back to home',
     confirm_new: 'New report',
+
+    // Tracking
+    tracking_title: 'Incident tracking',
+    tracking_reference: 'Reference',
+    tracking_status: 'Status',
+    tracking_unit: 'Assigned unit',
+    tracking_unit_none: 'Awaiting assignment',
+    tracking_call_standard: 'Call switchboard',
+    tracking_call_chef: 'Call unit chief',
+    tracking_history: 'History',
+    tracking_created: 'Report created',
+    tracking_copy: 'Copy reference',
+    tracking_copied: 'Reference copied!',
+    tracking_refresh: 'Refresh',
+    tracking_loading: 'Loading...',
+    tracking_error: 'Unable to load incident',
+    tracking_medias: 'Photos and audio',
+    tracking_no_medias: 'No media attached',
+    tracking_play_audio: 'Play voice message',
+    tracking_stop_audio: 'Stop playback',
+    tracking_timeline: 'Timeline',
+    tracking_assigned_at: 'Assignment',
+    tracking_arrived_at: 'Arrived on scene',
+    tracking_resolved_at: 'Resolution',
+    tracking_just_now: 'Just now',
+    tracking_last_update: 'Last update',
+    tracking_map_incident: 'Your report',
+    tracking_map_unit: 'Response unit',
+
+    // My Incidents
+    my_incidents_title: 'My reports',
+    my_incidents_empty: 'No reports yet',
+    my_incidents_empty_desc: 'Your reports will appear here',
+
+    // Statuts
+    status_ALERTE: 'Alert',
+    status_ASSIGNE: 'Assigned',
+    status_EN_ROUTE: 'En route',
+    status_SUR_PLACE: 'On site',
+    status_EN_COURS: 'In progress',
+    status_RESOLU: 'Resolved',
+    status_CLOS: 'Closed',
+    status_ANNULE: 'Cancelled',
+
+    // Confirm updated
+    confirm_track: 'Track my incident',
+
+    // Summary (step 3)
+    summary_declarant: 'Reporter',
+    summary_type_label: 'INCIDENT TYPE',
+    summary_description: 'DESCRIPTION',
+    summary_voice: 'VOICE MESSAGE',
+    summary_voice_recording: 'Recording',
+    summary_location: 'LOCATION',
+    summary_contact: 'CONTACT',
+    summary_footer: '237 Urgences - Incident report',
+
+    // Home - My incidents
+    home_my_incidents: 'My reports',
+
+    // Tab labels
+    tab_home: 'Home',
+    tab_incidents: 'Reports',
+    tab_profile: 'Profile',
+
+    // Services screen
+    services_title: 'Services',
+    services_emergency_numbers: 'Emergency numbers',
+    services_nearby: 'Nearby',
+    services_emergency_general: 'General emergencies',
+    services_police: 'Police',
+    services_fire: 'Firefighters',
+    services_dev_banner: 'Module under development — indicative data',
+
+    // Tab labels updated
+    tab_services: 'Services',
+
+    // Home SOS redesign
+    home_sos: 'SOS',
+    home_sos_subtitle: 'Report an emergency',
+    home_quick_type: 'Emergency type',
+    home_active_incident: 'Active emergency',
+    home_no_active: 'No active emergency',
+    home_location: 'Your location',
+    home_location_active: 'GPS active',
+    home_location_searching: 'Searching...',
+    home_identity: 'Identified citizen',
+    home_no_services: 'No services available',
+    home_no_services_desc: 'Nearby health services will be available soon',
 
     // Common
     ok: 'OK',

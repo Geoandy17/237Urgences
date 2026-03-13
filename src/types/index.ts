@@ -1,92 +1,60 @@
+import { TypeUrgence, Region, StatutIncident, IncidentResponse } from '../services/api';
+
 export type RootStackParamList = {
   Splash: undefined;
   Welcome: undefined;
   Register: undefined;
-  Login: { nom?: string; prenom?: string; email?: string };
-  OTP: { phoneNumber: string; verificationId?: string; nom?: string; prenom?: string; email?: string };
+  Login: undefined;
+  OTP: {
+    phoneNumber: string;
+    verificationId?: string;
+    nom: string;
+    prenom: string;
+    email?: string;
+    motDePasse: string;
+  };
   MainTabs: undefined;
   EmergencyCall: undefined;
   Hospitals: undefined;
   Pharmacies: undefined;
   DeclareIncident: undefined;
-  IncidentDetail: { incident: Incident };
-  IncidentConfirmation: { payload: IncidentPayload };
+  IncidentConfirmation: { reference: string };
+  IncidentTracking: { reference: string };
+  MyIncidents: undefined;
+  Settings: undefined;
 };
 
 export type MainTabParamList = {
   Home: undefined;
+  Services: undefined;
+  MyIncidents: undefined;
   Profile: undefined;
 };
 
-export interface User {
-  id: string;
-  name: string;
-  phoneNumber: string;
-  createdAt: Date;
+export interface UserData {
+  userId: number;
+  nom: string;
+  prenom: string;
+  telephone: string;
+  email?: string;
+  role: string;
 }
 
 export interface Incident {
-  id: string;
-  userId: string;
-  userName: string;
-  category: IncidentCategory;
+  id: number;
+  reference: string;
+  typeUrgence: TypeUrgence;
+  statut: StatutIncident;
   description: string;
-  location?: {
-    latitude: number;
-    longitude: number;
-    address?: string;
-  };
-  status: 'pending' | 'in_progress' | 'resolved';
-  createdAt: Date;
+  ville: string;
+  region: Region;
+  createdAt: string;
 }
 
-export type IncidentCategory =
-  | 'vol'
-  | 'agression'
-  | 'accident'
-  | 'incendie'
-  | 'arnaque'
-  | 'vandalisme'
-  | 'disparition'
-  | 'autre';
+export type IncidentCategory = TypeUrgence;
 
-// Format de données envoyé au service tiers pour signalement
-export interface IncidentPayload {
-  id: string;
-  timestamp: string;               // ISO 8601
-  type: IncidentCategory;
-  typeLabel: string;
-  description: string;
-  audio: {
-    uri: string | null;
-    durationSeconds: number;
-  };
-  declarant: {
-    userId: string;
-    nom: string;
-    prenom: string;
-    phone: string;                  // numéro OTP (celui avec lequel il s'est connecté)
-    selfieUri: string;
-  };
-  contactUrgence: {
-    nom: string;
-    phone: string;                  // numéro saisi dans le formulaire
-    countryCode: string;
-    countryDial: string;
-  };
-  location: {
-    mode: 'gps' | 'manual';
-    latitude: number | null;
-    longitude: number | null;
-    address: string | null;
-    city: string | null;
-    region: string | null;
-    villeManuelle: string | null;
-    quartierManuel: string | null;
-  };
-  status: 'pending';
-  platform: string;                 // ios | android | web
-}
+// Re-export API types for convenience
+export type { TypeUrgence, Region, StatutIncident, IncidentResponse };
 
 export interface EmergencyService {
   id: string;
