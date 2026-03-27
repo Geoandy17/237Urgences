@@ -14,18 +14,19 @@ import { apiGetIncidentSuivi, IncidentResponse, BASE_URL } from '../services/api
 import { connectWebSocket } from '../services/websocket';
 import * as Clipboard from 'expo-clipboard';
 
-// react-native-maps n'est pas compatible web — import conditionnel
-let MapView: any = null;
-let Marker: any = null;
-let PROVIDER_GOOGLE: any = null;
-if (Platform.OS !== 'web') {
-  try {
-    const Maps = require('react-native-maps');
-    MapView = Maps.default;
-    Marker = Maps.Marker;
-    PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
-  } catch {}
-}
+// react-native-maps désactivé temporairement — pas de clé Google Maps configurée
+// TODO: réactiver avec la clé API Google Maps dans app.json
+// let MapView: any = null;
+// let Marker: any = null;
+// let PROVIDER_GOOGLE: any = null;
+// if (Platform.OS !== 'web') {
+//   try {
+//     const Maps = require('react-native-maps');
+//     MapView = Maps.default;
+//     Marker = Maps.Marker;
+//     PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+//   } catch {}
+// }
 
 const MEDIA_BASE_URL = BASE_URL.replace('/api/v1', '');
 
@@ -483,44 +484,8 @@ export default function IncidentTrackingScreen({ navigation, route }: Props) {
             </View>
           )}
 
-          {/* ===== CARTE MAP ===== */}
-          {Platform.OS !== 'web' && MapView && Marker && incident.latitude !== 0 && incident.longitude !== 0 && (
-            <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border, overflow: 'hidden' }]}>
-              <View style={[styles.sectionHeader, { paddingHorizontal: 16, paddingTop: 14 }]}>
-                <View style={[styles.sectionIconBg, { backgroundColor: '#EF444415' }]}>
-                  <Ionicons name="map" size={16} color="#EF4444" />
-                </View>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  {language === 'fr' ? 'Localisation' : 'Location'}
-                </Text>
-              </View>
-              <MapView
-                style={styles.map}
-                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                initialRegion={{
-                  latitude: incident.latitude,
-                  longitude: incident.longitude,
-                  latitudeDelta: incident.uniteAssignee?.latitude ? 0.05 : 0.01,
-                  longitudeDelta: incident.uniteAssignee?.latitude ? 0.05 : 0.01,
-                }}
-              >
-                <Marker
-                  coordinate={{ latitude: incident.latitude, longitude: incident.longitude }}
-                  title={t('tracking_map_incident')}
-                  description={incident.description.substring(0, 60)}
-                  pinColor="#CE1126"
-                />
-                {incident.uniteAssignee?.latitude && incident.uniteAssignee?.longitude && (
-                  <Marker
-                    coordinate={{ latitude: incident.uniteAssignee.latitude, longitude: incident.uniteAssignee.longitude }}
-                    title={t('tracking_map_unit')}
-                    description={incident.uniteAssignee.nom}
-                    pinColor="#009639"
-                  />
-                )}
-              </MapView>
-            </View>
-          )}
+          {/* ===== CARTE MAP — désactivée temporairement (pas de clé Google Maps) ===== */}
+          {/* TODO: réactiver quand la clé API Google Maps sera configurée dans app.json */}
 
           {/* ===== HISTORIQUE ===== */}
           {incident.historique && incident.historique.length > 0 && (

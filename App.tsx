@@ -1,4 +1,4 @@
-import 'text-encoding-polyfill';
+// import 'text-encoding-polyfill'; // Désactivé temporairement — cause un crash sur mobile
 import React from 'react';
 import { ThemeProvider } from './src/config/theme';
 import { I18nProvider } from './src/config/i18n';

@@ -21,7 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   updateUser: async () => {},
 });
 
-const USER_STORAGE_KEY = '@237urgences_user';
+const USER_STORAGE_KEY = 'urgences237_user';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserData | null>(null);

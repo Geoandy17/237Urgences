@@ -1,18 +1,18 @@
-import { Client, IMessage } from '@stomp/stompjs';
-import { IncidentResponse, BASE_URL } from './api';
+// import { Client, IMessage } from '@stomp/stompjs';
+import { IncidentResponse } from './api';
 
-// Construire l'URL WebSocket à partir de BASE_URL
-const WS_URL = BASE_URL.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/ws';
+// const WS_URL = BASE_URL.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/ws';
 
 // Mode démo : false = connexion réelle au serveur
-const DEMO_MODE = false;
+// const DEMO_MODE = false;
 
 // Intervalle de polling REST en fallback (30 secondes)
 const POLLING_INTERVAL = 30000;
 
 type StatusCallback = (incident: IncidentResponse) => void;
 
-let stompClient: Client | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let stompClient: any = null;
 
 /**
  * Se connecter au WebSocket STOMP et écouter les changements de statut
@@ -20,8 +20,8 @@ let stompClient: Client | null = null;
  * En mode démo ou si le WebSocket échoue, active un polling REST en fallback.
  */
 export function connectWebSocket(
-  reference: string,
-  onStatusUpdate: StatusCallback,
+  _reference: string,
+  _onStatusUpdate: StatusCallback,
   fetchFallback: () => Promise<void>,
 ): () => void {
   let pollingTimer: ReturnType<typeof setInterval> | null = null;
@@ -41,55 +41,44 @@ export function connectWebSocket(
     }
   };
 
-  if (DEMO_MODE) {
-    // En mode démo, on fait du polling REST uniquement
-    startPolling();
-    return () => {
-      disconnected = true;
-      stopPolling();
-    };
-  }
+  // if (DEMO_MODE) {
+  //   // En mode démo, on fait du polling REST uniquement
+  //   startPolling();
+  //   return () => {
+  //     disconnected = true;
+  //     stopPolling();
+  //   };
+  // }
 
-  // Mode réel : connexion WebSocket STOMP
-  try {
-    stompClient = new Client({
-      brokerURL: WS_URL,
-      reconnectDelay: 5000,
-      heartbeatIncoming: 10000,
-      heartbeatOutgoing: 10000,
-    });
+  // WebSocket STOMP désactivé temporairement — serveur WS non disponible
+  // TODO: réactiver quand le serveur WebSocket sera opérationnel
+  // try {
+  //   stompClient = new Client({
+  //     brokerURL: WS_URL,
+  //     reconnectDelay: 5000,
+  //     heartbeatIncoming: 10000,
+  //     heartbeatOutgoing: 10000,
+  //   });
+  //   stompClient.onConnect = () => {
+  //     stopPolling();
+  //     stompClient?.subscribe('/topic/statuts', (msg: IMessage) => {
+  //       try {
+  //         const incident: IncidentResponse = JSON.parse(msg.body);
+  //         if (incident.reference === reference) {
+  //           onStatusUpdate(incident);
+  //         }
+  //       } catch {}
+  //     });
+  //   };
+  //   stompClient.onStompError = () => { startPolling(); };
+  //   stompClient.onWebSocketClose = () => { if (!disconnected) startPolling(); };
+  //   stompClient.activate();
+  // } catch {
+  //   startPolling();
+  // }
 
-    stompClient.onConnect = () => {
-      // Arrêter le polling si le WebSocket est connecté
-      stopPolling();
-
-      // Écouter les changements de statut
-      stompClient?.subscribe('/topic/statuts', (msg: IMessage) => {
-        try {
-          const incident: IncidentResponse = JSON.parse(msg.body);
-          // Filtrer par référence pour ne traiter que notre incident
-          if (incident.reference === reference) {
-            onStatusUpdate(incident);
-          }
-        } catch {}
-      });
-    };
-
-    stompClient.onStompError = () => {
-      // En cas d'erreur STOMP, basculer sur le polling
-      startPolling();
-    };
-
-    stompClient.onWebSocketClose = () => {
-      // Connexion perdue, basculer sur le polling
-      if (!disconnected) startPolling();
-    };
-
-    stompClient.activate();
-  } catch {
-    // WebSocket indisponible, fallback polling
-    startPolling();
-  }
+  // Fallback polling REST uniquement
+  startPolling();
 
   // Retourne la fonction de déconnexion
   return () => {

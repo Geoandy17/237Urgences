@@ -8,8 +8,8 @@ const BASE_URL = 'http://154.126.128.36:8080/api/v1';
 // Mode démo : false = appels réels au serveur
 const DEMO_MODE = false;
 
-const TOKEN_KEY = '@237urgences_access_token';
-const REFRESH_KEY = '@237urgences_refresh_token';
+const TOKEN_KEY = 'urgences237_access_token';
+const REFRESH_KEY = 'urgences237_refresh_token';
 
 // ===== TYPES API =====
 
@@ -143,7 +143,7 @@ export interface ProfilResponse {
 
 // ===== DONNÉES DÉMO =====
 
-const DEMO_STORAGE_KEY = '@237urgences_demo_incidents';
+const DEMO_STORAGE_KEY = 'urgences237_demo_incidents';
 
 let demoUserId = 1;
 
